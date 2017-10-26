@@ -50,7 +50,7 @@ class SSEBop():
         self.date = ee.Date(ee.Image(image).get('system:time_start'))
         self.year = ee.Number(self.date.get('year'))
         self.month = ee.Number(self.date.get('month'))
-        self.start_date = ee.Date(self._date_to_time_0utc(self.date))
+        self.start_date = ee.Date(_date_to_time_0utc(self.date))
         self.end_date = self.start_date.advance(1, 'day')
         self.doy = ee.Number(self.date.getRelative('day', 'year')).add(1).int()
 
@@ -94,7 +94,7 @@ class SSEBop():
 
     def _get_dt(self):
         """"""
-        if self._is_number(self.dt_source):
+        if _is_number(self.dt_source):
             dt_coll = ee.ImageCollection([
                 ee.Image.constant(self.dt_source).set('DOY', self.doy)])
         elif self.dt_source.upper() == 'ASSET':
@@ -107,7 +107,7 @@ class SSEBop():
 
     def _get_elev(self):
         """"""
-        if self._is_number(self.elev_source):
+        if _is_number(self.elev_source):
             elev_image = ee.Image.constant(ee.Number(self.elev_source))
         elif self.elev_source.upper() == 'ASSET':
             elev_image = ee.Image('projects/usgs-ssebop/srtm_1km')
@@ -149,7 +149,7 @@ class SSEBop():
             ee.Number: Tcorr INDEX value
         """
 
-        if self._is_number(self.tcorr_source):
+        if _is_number(self.tcorr_source):
             tcorr = ee.Number(self.tcorr_source)
             tcorr_index = ee.Number(3)
         elif (self.tcorr_source.upper() == 'SCENE' and
@@ -189,7 +189,7 @@ class SSEBop():
         return tcorr, tcorr_index
 
     def _get_tmax(self):
-        if self._is_number(self.tmax_source):
+        if _is_number(self.tmax_source):
             tmax_coll = ee.ImageCollection([
                 ee.Image.constant(self.tmax_source).rename(['tmax'])])
         elif self.tmax_source.upper() == 'DAYMET':
@@ -198,7 +198,7 @@ class SSEBop():
             tmax_coll = ee.ImageCollection('NASA/ORNL/DAYMET_V3') \
                 .filterDate(self.start_date, self.end_date.advance(1, 'day')) \
                 .select(['tmax']) \
-                .map(self._c_to_k)
+                .map(_c_to_k)
         else:
             logging.error('\nUnsupported tmax_source: {}\n'.format(
                 self.tmax_source))
@@ -206,29 +206,32 @@ class SSEBop():
 
         return ee.Image(tmax_coll.first())
 
-    # Eventually move to common or utils
-    def _c_to_k(image):
-        """Convert temperature from C to K"""
-        return image.add(273.15) \
-            .copyProperties(image, system_properties)
 
-    def _date_to_time_0utc(date):
-        """Get the 0 UTC time_start for a date
+# Eventually move to common or utils
+def _c_to_k(image):
+    """Convert temperature from C to K"""
+    return image.add(273.15) \
+        .copyProperties(image, system_properties)
 
-        Extra operations are needed since update() does not set milliseconds to 0.
 
-        Args:
-            date (ee.Date):
+def _date_to_time_0utc(date):
+    """Get the 0 UTC time_start for a date
 
-        Returns:
-            ee.Number
-        """
-        return date.update(hour=0, minute=0, second=0).millis()\
-            .divide(1000).floor().multiply(1000)
+    Extra operations are needed since update() does not set milliseconds to 0.
 
-    def _is_number(x):
-        try:
-            float(x)
-            return True
-        except:
-            return False
+    Args:
+        date (ee.Date):
+
+    Returns:
+        ee.Number
+    """
+    return date.update(hour=0, minute=0, second=0).millis()\
+        .divide(1000).floor().multiply(1000)
+
+
+def _is_number(x):
+    try:
+        float(x)
+        return True
+    except:
+        return False
