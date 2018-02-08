@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.bak
+.cache
+.idea
+.ipynb_checkpoints
+
+eeflux
