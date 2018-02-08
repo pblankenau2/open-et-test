@@ -38,6 +38,12 @@ class SSEBop():
             Maximum air temperature data set keyword (the default is 'DAYMET').
         tdiff_threshold :  float
             Cloud mask buffer using Tdiff (in K) (the default is 15).
+
+        Notes
+        -----
+        Currently image must have a Landsat style 'system:index' in order to
+        lookup Tcorr value from table asset.  (i.e. LC08_043033_20150805)
+
         """
         input_image = ee.Image(image)
 
@@ -81,7 +87,6 @@ class SSEBop():
         Apply Tdiff cloud mask buffer (mask values of 0 are set to nodata)
 
         """
-
         # Get input images and ancillary data needed to compute SSEBop ETf
         lst = ee.Image(self.lst)
         tcorr, tcorr_index = self._tcorr()
@@ -105,15 +110,14 @@ class SSEBop():
     def _dt(self):
         """"""
         if _is_number(self.dt_source):
-            dt_coll = ee.ImageCollection([
-                ee.Image.constant(self.dt_source).set('DOY', self.doy)])
+            return ee.Image.constant(self.dt_source).set('DOY', self.doy)
         elif self.dt_source.upper() == 'ASSET':
             dt_coll = ee.ImageCollection('projects/usgs-ssebop/daymet_dt_median') \
                 .filter(ee.Filter.calendarRange(self.doy, self.doy, 'day_of_year'))
+            return ee.Image(dt_coll.first())
         else:
             logging.error('\nInvalid dT: {}\n'.format(self.dt_source))
             sys.exit()
-        return ee.Image(dt_coll.first())
 
     def _elev(self):
         """"""
