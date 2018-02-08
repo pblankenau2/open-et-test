@@ -33,11 +33,18 @@ class NDVI_ET():
         self._b = b
         self._elevation = elevation
 
+        # Copy system properties
+        self.index = input_image.get('system:index')
+        self.time_start = input_image.get('system:time_start')
+
     def etf(self):
         """Compute ETf"""
-        return ee.Image(self.ndvi) \
+        etf = ee.Image(self.ndvi) \
             .multiply(self._m).add(self._b) \
-            .rename(['etf'])
+            .setMulti({
+                'system:index': self.index,
+                'system:time_start': self.time_start})
+        return ee.Image(etf).rename(['etf'])
 
     def _ndvi(self):
         """Compute NDVI
