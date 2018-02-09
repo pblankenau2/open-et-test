@@ -1,1 +1,1 @@
-# Earth Engine SSEBop
+# Earth Engine SSEBop ET Model
