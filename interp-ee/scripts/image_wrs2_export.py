@@ -38,12 +38,17 @@ import eeflux
 def main(ini_path=None, overwrite_flag=False):
     """Export daily ET/ETrF/ETr/count images as EE assets or to Google Drive
 
-    Args:
-        ini_path (str): Input file path
-        overwrite_flag (bool): if True, overwrite existing files
+    Parameters
+    ----------
+    ini_path : str
+        Input file path.
+    overwrite_flag : bool, optional
+        If True, overwrite existing files (the default is False)
 
-    Returns:
-        None
+    Returns
+    -------
+    None
+
     """
     logging.info('\nComputing daily ET/ETrF/ETr/count images')
 
@@ -178,13 +183,6 @@ def main(ini_path=None, overwrite_flag=False):
             image_date = image_dt.date().isoformat()
             # logging.debug('  Date: {0}'.format(image_date))
             # logging.debug('  DOY: {0}'.format(doy))
-
-            # task_id = 'ssebop_{}'.format(landsat_id)
-            # export_id = '{}_etf'.format(landsat_id)
-            # asset_id = '{}'.format(landsat_id)
-            # # export_path = os.path.join(output_ws, export_id + '.tif')
-            # asset_path = asset_ws + '/' + asset_id
-            # logging.debug('  Task ID: {0}'.format(task_id))
 
             # Export products
             for product in ini['EXPORT']['products']:
@@ -355,7 +353,7 @@ def wrs2_tile_export_generator(study_area_path, wrs2_coll,
     Args:
         study_area_path (str): File path of the study area shapefile
         wrs2_coll (str): WRS2 Landsat footprint asset ID.
-            (should default to "projects/ssebop-gee/wrs2_descending_custom")
+            (should default to "projects/eeflux/wrs2_descending_custom")
         cell_size (float): Cell size [m].  Defaults to 30.
         output_crs (str): Output CRS (for setting 'crs' parameter in EE calls).
             Defaults to None.

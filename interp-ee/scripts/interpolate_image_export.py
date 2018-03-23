@@ -42,12 +42,17 @@ import eeflux
 def main(ini_path=None, overwrite_flag=False):
     """Export annual ET/ETrF/ETr/count images
 
-    Args:
-        ini_path (str): Input file path
-        overwrite_flag (bool): if True, overwrite existing files
+    Parameters
+    ----------
+    ini_path : str
+        Input file path.
+    overwrite_flag : bool, optional
+        If True, overwrite existing files (the default is False)
 
-    Returns:
-        None
+    Returns
+    -------
+    None
+
     """
     logging.info('\nExport annual ET/ETrF/ETr/count image')
 
@@ -402,7 +407,7 @@ def image_export_generator(study_area_path, wrs2_coll,
     Args:
         study_area_path (str): File path of the study area shapefile
         wrs2_coll (str): WRS2 Landsat footprint asset ID.
-            (should default to "projects/ssebop-gee/wrs2_descending_custom")
+            (should default to "projects/eeflux/wrs2_descending_custom")
         cell_size (float): Cell size [m].  Defaults to 30.
         output_crs (str): Output CRS (for setting 'crs' parameter in EE calls).
             Defaults to None.
@@ -550,8 +555,8 @@ def arg_parse():
     args = parser.parse_args()
 
     # Prompt user to select an INI file if not set at command line
-    if not args.ini:
-        args.ini = utils.get_ini_path(os.getcwd())
+    # if not args.ini:
+    #     args.ini = utils.get_ini_path(os.getcwd())
     return args
 
 

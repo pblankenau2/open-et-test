@@ -36,17 +36,26 @@ import eeflux
 
 
 def main(ini_path=None, overwrite_flag=False,
-         tile_i='', tile_j=''):
+         tile_i='', tile_j='', delay=0):
     """Export annual ET/ETrF/ETr/count image tiles
 
-    Args:
-        ini_path (str): Input file path
-        overwrite_flag (bool): if True, overwrite existing files
-        tile_i (str): comma separated list and/or range of tile row indices
-        tile_j (str): comma separated list and/or range of tile columns indices
+    Parameters
+    ----------
+    ini_path : str
+        Input file path.
+    overwrite_flag : bool, optional
+        If True, overwrite existing files (the default is False).
+    tile_i : str
+        Comma separated list and/or range of tile row indices.
+    tile_j : str
+        Comma separated list and/or range of tile columns indices.
+    delay : float, optional
+        Delay time between each export task (the default is 0).
 
-    Returns:
-        None
+    Returns
+    -------
+    None
+
     """
     logging.info('\nExport annual ET/ETrF/ETr/count image tiles')
 
@@ -382,6 +391,9 @@ def main(ini_path=None, overwrite_flag=False,
             # logging.debug('    Active: {}'.format(task.active()))
             # logging.debug('    Status: {}'.format(task.status()))
 
+            if delay and delay > 0:
+                time.sleep(delay)
+
 
 def tile_export_generator(study_area_path, wrs2_coll,
                           cell_size=30, output_crs=None, output_osr=None,
@@ -396,7 +408,7 @@ def tile_export_generator(study_area_path, wrs2_coll,
     Args:
         study_area_path (str): File path of the study area shapefile
         wrs2_coll (str): WRS2 Landsat footprint asset ID.
-            (should default to "projects/ssebop-gee/wrs2_descending_custom")
+            (should default to "projects/eeflux/wrs2_descending_custom")
         cell_size (float): Cell size [m].  Defaults to 30.
         output_crs (str): Output CRS (for setting 'crs' parameter in EE calls).
             Defaults to None.
@@ -526,8 +538,8 @@ def tile_export_generator(study_area_path, wrs2_coll,
     # We need a list of tile indices (or geometries) in order to build
     #   the tile collection below
     export_list = []
-    for tile_i in range(0, tile_rows):
-        for tile_j in range(0, tile_cols):
+    for tile_j in range(0, tile_cols):
+        for tile_i in range(0, tile_rows):
             tile_geo = [
                 cell_size, 0, output_extent[0] + tile_j * tile_size,
                 0, -cell_size, output_extent[3] - tile_i * tile_size]
@@ -648,6 +660,9 @@ def arg_parse():
         '--cols', default='',
         help='Columns to process (comma separate or range)')
     parser.add_argument(
+        '--delay', default=0, type=float,
+        help='Delay (in seconds) between each export tasks')
+    parser.add_argument(
         '-o', '--overwrite', default=False, action='store_true',
         help='Force overwrite of existing files')
     parser.add_argument(
@@ -673,4 +688,4 @@ if __name__ == '__main__':
         'Script:', os.path.basename(sys.argv[0])))
 
     main(ini_path=args.ini, overwrite_flag=args.overwrite,
-         tile_i=args.rows, tile_j=args.cols)
+         tile_i=args.rows, tile_j=args.cols, delay=args.delay)
