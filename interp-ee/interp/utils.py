@@ -34,20 +34,59 @@ def arg_valid_file(file_path):
         raise argparse.ArgumentTypeError('{} does not exist'.format(file_path))
 
 
-def get_bucket_files(project_name, bucket_name):
+def get_ee_assets(asset_id, shell_flag=False):
+    """Return Google Earth Engine assets
+
+    Parameters
+    ----------
+    asset_id : str
+        A folder or image collection ID.
+    shell_flag : bool
+        If True, execute the command through the shell (the default is True).
+
+    Returns
+    -------
+    list of asset names
+
+    """
+    try:
+        asset_list = subprocess.check_output(
+            ['earthengine', 'ls', asset_id],
+            universal_newlines=True, shell=shell_flag)
+        asset_list = [x.strip() for x in asset_list.split('\n') if x]
+        # logging.debug(asset_list)
+    except ValueError as e:
+        logging.info('  Collection doesn\'t exist')
+        logging.debug('  {}'.format(str(e)))
+        asset_list = []
+    except Exception as e:
+        logging.error('\n  Unknown error, returning False')
+        logging.error(e)
+        sys.exit()
+    return asset_list
+
+
+def get_bucket_files(project_name, bucket_name, shell_flag=True):
     """Return Google Cloud Storage buckets associated with project
 
-    Args:
-        project_name (str): AppEngine project name
-        bucket_name (str): Google Storage bucket name
+    Parameters
+    ----------
+    project_name : str
+        AppEngine project name.
+    bucket_name : str
+        Google Storage bucket name.
+    shell_flag : bool
+        If True, ? (the default is True).
 
-    Returns:
-        list of file names
+    Returns
+    -------
+    list of file names
+
     """
     try:
         file_list = subprocess.check_output(
             ['gsutil', 'ls', '-r', '-p', project_name, bucket_name],
-            universal_newlines=True, shell=True)
+            universal_newlines=True, shell=shell_flag)
         # file_list = [x.strip() for x in file_list.split('\n') if x]
     except Exception as e:
         logging.error(
@@ -61,8 +100,14 @@ def get_bucket_files(project_name, bucket_name):
 def get_ee_tasks(states=['RUNNING', 'READY']):
     """Return current active tasks
 
-    Returns:
-        dict of task descriptions (key) and task IDs (value)
+    Parameters
+    ----------
+    states : list
+
+    Returns
+    -------
+    dict of task descriptions (key) and task IDs (value)
+
     """
 
     logging.debug('\nActive Tasks')

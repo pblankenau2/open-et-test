@@ -67,6 +67,11 @@ def main(ini_path=None, overwrite_flag=False,
     inputs.parse_section(ini, section='TILE')
     inputs.parse_section(ini, section=ini['INPUTS']['et_model'])
 
+    if os.name == 'posix':
+        shell_flag = False
+    else:
+        shell_flag = True
+
     if ini['EXPORT']['export_dest'] == 'ASSET':
         logging.error('\nERROR: ASSET tile export is not supported')
         return False
@@ -104,10 +109,16 @@ def main(ini_path=None, overwrite_flag=False,
     tasks = utils.get_ee_tasks()
 
     # Get list of existing images/files
-    if ini['EXPORT']['export_dest'] == 'CLOUD':
+    if ini['EXPORT']['export_dest'] == 'ASSET':
+        logging.debug('\nGetting GEE asset list')
+        asset_list = utils.get_ee_assets(
+            ini['EXPORT']['output_ws'], shell_flag=shell_flag)
+        logging.debug(asset_list)
+    elif ini['EXPORT']['export_dest'] == 'CLOUD':
         logging.debug('\nGetting cloud storage file list')
         cloud_list = utils.get_bucket_files(
-            ini['EXPORT']['project_name'], ini['EXPORT']['output_ws'])
+            ini['EXPORT']['project_name'], ini['EXPORT']['output_ws'],
+            shell_flag=shell_flag)
         # It may be necessary to remove image tile notation
     elif ini['EXPORT']['export_dest'] == 'GDRIVE':
         logging.debug('\nGetting Google drive file list')
@@ -203,11 +214,17 @@ def main(ini_path=None, overwrite_flag=False,
 
 
         # Daily reference ET collection
-        # DEADBEEF - Hard coding to GRIDMET for now
-        # Should this be retrieved from the model?
-        daily_et_reference_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET') \
-            .filterDate(ini['INPUTS']['start_date'], ini['INPUTS']['end_date']) \
-            .select(['etr'], ['et_reference'])
+        # Is the "refet_source" a function of the model, interpolation, or other?
+        # The "refet_type" parameter is currently being ignored
+        if ini[ini['INPUTS']['et_model']]['refet_source'] == 'GRIDMET':
+            daily_et_reference_coll = ee.ImageCollection('IDAHO_EPSCOR/GRIDMET') \
+                .filterDate(ini['INPUTS']['start_date'], ini['INPUTS']['end_date']) \
+                .select(['etr'], ['et_reference'])
+        # elif ini[ini['INPUTS']['et_model']]['refet_source'] == 'CIMIS':
+        #     daily_et_reference_coll = ee.ImageCollection('projects/climate-engine/cimis/daily') \
+        #         .filterDate(ini['INPUTS']['start_date'],
+        #                     ini['INPUTS']['end_date']) \
+        #         .select(['etr_asce'], ['et_reference'])
 
         # Compute composite/mosaic images for each image date
         daily_et_fraction_coll = ee.ImageCollection(interpolate.aggregate_daily(
@@ -272,7 +289,8 @@ def main(ini_path=None, overwrite_flag=False,
                     # Files in cloud storage are easily overwritten
                     #   so it is unneccesary to manually remove them
                     # # This would remove an existing file
-                    # subprocess.call(['gsutil', 'rm', export_path])
+                    # subprocess.check_output(
+                    #     ['gsutil', 'rm', export_path], shell=shell_flag)
                 elif (ini['EXPORT']['export_dest'] == 'GDRIVE' and
                         export_path in gdrive_list):
                     logging.debug('    Export image already exists, removing')
@@ -339,7 +357,8 @@ def main(ini_path=None, overwrite_flag=False,
                         scene_id_coll,
                         description=export_id,
                         bucket=ini['EXPORT']['bucket_name'],
-                        fileNamePrefix='{}/{}'.format(product, export_id),
+                        fileNamePrefix='{}/{}/{}'.format(
+                            ini['EXPORT']['bucket_folder'], product, export_id),
                         fileFormat='CSV')
                 elif ini['EXPORT']['export_dest'] == 'GDRIVE':
                     # Export the scene list CSV to Google Drive
@@ -349,13 +368,26 @@ def main(ini_path=None, overwrite_flag=False,
                         folder=os.path.basename(ini['EXPORT']['output_ws']),
                         fileNamePrefix=export_id,
                         fileFormat='CSV')
+            if ini['EXPORT']['export_dest'] == 'asset':
+                # Export the image to cloud storage
+                task = ee.batch.Export.image.toAsset(
+                    output_image,
+                    description=export_id,
+                    bucket=ini['EXPORT']['bucket_name'],
+                    fileNamePrefix='{}/{}/{}'.format(
+                        ini['EXPORT']['bucket_folder'], product, export_id),
+                    dimensions=export_info['shape'],
+                    crs=export_info['crs'],
+                    crsTransform=export_info['geo'],
+                    maxPixels=export_info['maxpixels'])
             elif ini['EXPORT']['export_dest'] == 'CLOUD':
                 # Export the image to cloud storage
                 task = ee.batch.Export.image.toCloudStorage(
                     output_image,
                     description=export_id,
                     bucket=ini['EXPORT']['bucket_name'],
-                    fileNamePrefix='{}/{}'.format(product, export_id),
+                    fileNamePrefix='{}/{}/{}'.format(
+                        ini['EXPORT']['bucket_folder'], product, export_id),
                     dimensions=export_info['shape'],
                     crs=export_info['crs'],
                     crsTransform=export_info['geo'],
@@ -393,7 +425,8 @@ def main(ini_path=None, overwrite_flag=False,
 
             if delay and delay > 0:
                 time.sleep(delay)
-
+            elif delay and delay == -1:
+                input('ENTER')
 
 def tile_export_generator(study_area_path, wrs2_coll,
                           cell_size=30, output_crs=None, output_osr=None,
@@ -421,11 +454,11 @@ def tile_export_generator(study_area_path, wrs2_coll,
         snap_y (float): Y snap coordinate [m].  Defaults to 0.
         tile_cells (int): Tile width and height [pixels]. Defaults to 2000.
         wrs2_buffer (float): WRS2 footprint buffer distance [m].
-            Defaults to 10000.
+            Defaults to 0.
         n_max (int): Maximum number of WRS2 tiles to join to feature.
             Defaults to 1000.
         simplify_buffer (float): Study area buffer/simplify distance [m].
-            Defaults to 1000.
+            Defaults to 240.
 
     Yields:
         dict: export information
@@ -590,6 +623,11 @@ def tile_export_generator(study_area_path, wrs2_coll,
     else:
         wrs2_coll = ee.FeatureCollection(wrs2_coll) \
             .filterBounds(output_ee_geom)
+
+    # Apply the user defined WRS2 tile list
+    if wrs2_tile_list:
+        wrs2_coll = wrs2_coll.filter(ee.Filter.inList(
+            'WRS2_TILE', wrs2_tile_list))
 
     #  Join intersecting geometries
     tiles_coll = ee.Join.saveAll(matchesKey='scenes').apply(

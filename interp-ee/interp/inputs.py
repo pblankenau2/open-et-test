@@ -54,8 +54,6 @@ def parse_section(ini, section):
     # ET model specific sections
     elif section == 'NDVI':
         parse_ndvi(ini)
-    elif section == 'TCORR':
-        parse_tcorr(ini)
     elif section == 'EEFLUX':
         parse_eeflux(ini)
 
@@ -274,7 +272,7 @@ def parse_export(ini, section='EXPORT'):
         if not os.path.isdir(ini[section]['output_ws']):
             os.makedirs(ini[section]['output_ws'])
 
-    elif ini[section]['export_dest'] == ['ASSET']:
+    elif ini[section]['export_dest'] == 'ASSET':
         logging.info('  Asset Export')
         get_param(ini, section, 'export_path', 'output_ws', str)
         logging.debug('  {:16s} {}'.format(
@@ -284,6 +282,7 @@ def parse_export(ini, section='EXPORT'):
         logging.info('  Cloud Storage')
         get_param(ini, section, 'project_name', 'project_name', str, 'steel-melody-531')
         get_param(ini, section, 'bucket_name', 'bucket_name', str, None)
+        get_param(ini, section, 'bucket_folder', 'bucket_folder', str, None)
 
         if not ini[section]['project_name']:
             logging.error('\nERROR: {} must be set in INI, exiting\n'.format(
@@ -295,12 +294,17 @@ def parse_export(ini, section='EXPORT'):
                 'project_name parameter sets the project name.'
                 '  This parameter must be set to "steel-melody-531" for now')
             sys.exit()
-        if not ini[section]['bucket_name']:
+        if ini[section]['bucket_name']:
+            ini[section]['output_ws'] = 'gs://{}'.format(
+                ini[section]['bucket_name'])
+        else:
             logging.error('\nERROR: {} must be set in INI, exiting\n'.format(
                 ini[section]['bucket_name']))
             sys.exit()
-        ini[section]['output_ws'] = 'gs://{}'.format(
-            ini[section]['bucket_name'])
+        if ini[section]['bucket_folder']:
+            # Add folder to the path if it was set
+            ini[section]['output_ws'] = '{}/{}'.format(
+                ini[section]['output_ws'], ini[section]['bucket_folder'])
         logging.debug('  {:16s} {}'.format(
             'Project:', ini[section]['project_name']))
         logging.debug('  {:16s} {}'.format(
@@ -308,19 +312,20 @@ def parse_export(ini, section='EXPORT'):
         logging.debug('  {:16s} {}'.format(
             'Output Workspace:', ini[section]['output_ws']))
 
-        bucket_list = utils.get_buckets(ini[section]['project_name'])
-        if ini[section]['bucket_name'] not in bucket_list:
-            logging.error(
-                '\nERROR: The bucket "{}" does not exist, exiting'.format(
-                    ini[section]['bucket_name']))
-            return False
-            # Try creating the storage bucket if it doesn't exist using gsutil
-            # For now, I think it is better to make the user go do this
-            # subprocess.check_output([
-            #     'gsutil', 'mb', '-p', ini[section]['project_name'],
-            #     'gs://{}-{}'.format(
-            #         ini[section]['project_name'],
-            #         ini[section]['bucket_name'])])
+        # DEADBEEF - inputs.py doesn't have a function get_buckets
+        # bucket_list = utils.get_buckets(ini[section]['project_name'])
+        # if ini[section]['bucket_name'] not in bucket_list:
+        #     logging.error(
+        #         '\nERROR: The bucket "{}" does not exist, exiting'.format(
+        #             ini[section]['bucket_name']))
+        #     return False
+        #     # Try creating the storage bucket if it doesn't exist using gsutil
+        #     # For now, I think it is better to make the user go do this
+        #     # subprocess.check_output([
+        #     #     'gsutil', 'mb', '-p', ini[section]['project_name'],
+        #     #     'gs://{}-{}'.format(
+        #     #         ini[section]['project_name'],
+        #     #         ini[section]['bucket_name'])])
 
     # OPTIONAL PARAMETERS
     # param_section, input_name, output_name, get_type, default
