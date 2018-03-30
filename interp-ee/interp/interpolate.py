@@ -3,27 +3,31 @@ import sys
 
 import ee
 
-ee.Initialize()
-
 system_properties = ['system:index', 'system:time_start']
 
+ee.Initialize()
 
-def interp_et_coll(et_reference_coll, et_fraction_coll, interp_days=64,
-                   interp_type='linear'):
+
+def interp_et_coll(et_reference_coll, et_fraction_coll,
+                   interp_days=64, interp_type='linear'):
     """Generate daily ETa collection from ETo and ETf collections
 
-    Non-mappable function.
+    Parameters
+    ----------
+    et_reference_coll : ee.ImageCollection
+        Daily Reference ET images.
+    et_fraction_coll : ee.ImageCollection
+        Daily fraction of ET images.
+    interp_days : int, optional
+        Number of days before and after each image date to include in the
+        interpolation (the default is 64).
+    interp_type : {'linear'}, optional
+        Interpolation type (the default is 'linear')
 
-    Args:
-        et_reference_coll (ee.ImageCollection): Daily Reference ET images
-        et_fraction_coll (ee.ImageCollection): Landsat ETf images
-        interp_days (int):
-        interp_type (str): Interpolation type.
-            Choices are: "linear"
-            Defaults to "linear"
+    Returns
+    -------
+    ee.ImageCollection() of daily ET images
 
-    Returns:
-        ee.ImageCollection() of daily ET images
     """
     # Add TIME_0UTC as a separate image band for quality mosaic
     interp_etf_coll = et_fraction_coll.map(add_time_bands)
@@ -61,21 +65,31 @@ def interp_et_coll(et_reference_coll, et_fraction_coll, interp_days=64,
         logging.error('\nERROR: Invalid interpolation type: {}'.format(
             interp_type))
         sys.exit()
+        # raise exception?
         # return ee.ImageCollection([])
 
-
 def linear_et_func(image):
-    """Linearly interpolate daily ETf and multiply by daily reference ET
+    """Linearly interpolate daily ET fraction and multiply by daily
+    reference ET
 
+    Parameters
+    ----------
+    image : ee.Image
+        Input image must have band 'et_reference' and properties
+        'prev' and 'next'.
+
+    Returns
+    -------
+    ee.Image of interpolate ET
+
+    Notes
+    -----
     Function should be mapped over the daily daily ETo/ETr collection
         (i.e. ETo/ETr collection)
-
-    Image Bands:
-        et_reference:
-
     Image Properties:
         prev: list of images with bands: etf and time
         next: list of images with bands: etf and time
+
     """
     et_reference_image = ee.Image(image).select('et_reference')
 
@@ -115,29 +129,42 @@ def linear_et_func(image):
     interp_etf_image = next_etf_mosaic.subtract(prev_etf_mosaic) \
         .multiply(time_ratio_image).add(prev_etf_mosaic)
 
-    return interp_etf_image.multiply(et_reference_image).select([0], ['et']) \
+    return interp_etf_image.multiply(et_reference_image)\
+        .select([0], ['et']) \
         .copyProperties(image, system_properties)
 
 
-def aggregate_daily(image_coll, start_date, end_date, agg_type='mean'):
+def aggregate_daily(image_coll, start_date, end_date,
+                    agg_type='mean'):
     """Aggregate images by day
 
+    The primary purpose of this function is to join separate Landsat images
+    from the same path into a single daily image.
+
+    Parameters
+    ----------
+    image_coll : ee.ImageCollection
+        Input image collection.
+    start_date :  date, number, string
+        Start date.  Needs to be an EE readable date (i.e. ISO Date string
+        or milliseconds).
+    end_date :  date, number, string
+        End date.  Needs to be an EE readable date (i.e. ISO Date string or
+        milliseconds).
+    agg_type : {'mean'}, optional
+        Aggregation type (the default is 'mean').
+
+    Returns
+    -------
+    ee.ImageCollection()
+
+    Notes
+    -----
     This function should be used to mosaic Landsat images from same path
         but different rows
     Aggregation is currently hardcoded to 'mean'
     system:time_start of returned images will be 0 UTC (not the image time)
 
-    Args:
-        image_coll (ee.ImageCollection): Input image collection.
-        start_date (date/number/string): Start date.
-            Needs to be an EE readable date (ISO Date string or milliseconds)
-        end_date (date/number/string): End date.
-            Needs to be an EE readable date (ISO Date string or milliseconds)
-        agg_type (str): Aggregation type.
-            Currently only 'mean' is supported for daily aggregations
-
-    Returns:
-        ee.ImageCollection()
     """
     # Build a collection of date "features" to join to
     date_list = ee.List.sequence(
@@ -179,7 +206,8 @@ def add_time_bands(image):
     Intentionally using TIME_0UTC (instead of system:time_start)
         so that joins and interpolation happen evenly per day
     """
-    time_0utc = date_to_time_0utc(ee.Date(image.get('system:time_start')))
+    time_0utc = date_to_time_0utc(
+        ee.Date(image.get('system:time_start')))
     return image.addBands([
         image.select([0]).double().multiply(0).add(time_0utc).rename(['time'])])
 
@@ -187,13 +215,18 @@ def add_time_bands(image):
 def date_to_time_0utc(date):
     """Get the 0 UTC time_start for a date
 
+    Parameters
+    ----------
+    date : ee.Date
+
+    Returns
+    -------
+    ee.Number
+
+    Notes
+    -----
     Extra operations are needed since update() does not set milliseconds to 0.
 
-    Args:
-        date (ee.Date):
-
-    Returns:
-        ee.Number
     """
     return date.update(hour=0, minute=0, second=0).millis() \
         .divide(1000).floor().multiply(1000)
